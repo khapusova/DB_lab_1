@@ -1,0 +1,26 @@
+version: '3.8'
+services:
+  app:
+    build: ./app/
+    depends_on:
+      - db
+    environment:
+      PYTHONUNBUFFERED: 1
+    networks:
+      - test
+
+  db:
+    image: postgres:14
+    restart: always
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=root1
+      - POSTGRES_DB=student01_DB
+      - POSTGRES_HOST=db
+    ports:
+      - '5432:5432'
+    networks:
+      - test
+
+networks:
+  test:
