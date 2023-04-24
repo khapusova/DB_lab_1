@@ -14,44 +14,44 @@ def main():
     print("Start time: ", time.strftime("%H:%M:%S"))
 
     # Підключаємось до БД
-    conn = createConnection()
+    conn = create_conn()
 
-    #завантажуємо та розархівовуємо дані про ЗНО з сайту
-    download_7z()
+    #завантажуємо та розархівовуємо дані про ЗНО з сайту за допомогою ліби requests, csv та py7zr
+    save_data()
 
-    #створюємо датафрейм для зручної праці з даними
-    df19, df21 = createDataFrames()
+    #створюємо pandas Dataframe для завантаження даних в БД
+    df19, df21 = create_df()
 
-    if doesTableExist():
+    if isTable():
         print("Table exists")
     else:
         createTable()
         print("Table doesn't exist. Creating table...")
 
     #Вставляємо дані в таблицю
-    conn = createConnection()
-    insertDataIntoDB(df19, conn, 2019)
-    conn = createConnection()
-    insertDataIntoDB(df21, conn, 2021)
+    conn = create_conn()
+    insert_data_to_db(df19, conn, 2019)
+    conn = create_conn()
+    insert_data_to_db(df21, conn, 2021)
 
     #Виконуємо запит згідно 13-го варіанту
-    fetchResultsByRegion()
+    get_data_by_region()
 
     #Записуємо час виконання програми в текстовий файл
-    txtStopWatch(start_time)
+    txt_timer(start_time)
     conn.close()
     print("--- %s seconds ---" % round(time.time() - start_time, 2))
 
 
-def txtStopWatch(start_time):
+def txt_timer(start_time):
     with open('timer.txt', 'w', encoding='UTF-32') as f:
-        minutes = int((time.time() - start_time)/60)
-        seconds = int((time.time() - start_time) - minutes*60)
-        f.write("Time of executing: {0}:{1}".format(minutes, seconds))
+        mins = int((time.time() - start_time)/60)
+        secs = int((time.time() - start_time) - mins*60)
+        f.write("Time of executing: {0}:{1}".format(mins, secs))
         f.close()
 
 
-def createDataFrames():
+def create_df():
     data21 = pd.read_csv('Odata2021File.csv', sep=";", decimal=",", low_memory=False)
     data19 = pd.read_csv('Odata2019File.csv', sep=";", decimal=",", encoding="Windows-1251", low_memory=False)
     df19 = pd.DataFrame(data19, columns=['OUTID', 'Birth', 'SEXTYPENAME', 'REGNAME', 'AREANAME',
@@ -164,8 +164,8 @@ def createDataFrames():
     return df19, df21
 
 
-def createConnection():
-    for attempt in range(10):
+def create_conn():
+    for i in range(10):
         try:
             conn = psycopg2.connect(dbname='student01_DB', user='postgres', password='root1', host='db')
             print("Connection to database is successful")
@@ -178,13 +178,13 @@ def createConnection():
     sys.exit()
 
 
-def download_7z():
+def save_data():
     years = ["2019", "2021"]
     url19 = "https://zno.testportal.com.ua/yearstat/uploads/OpenDataZNO2019.7z"
-    url21= "https://zno.testportal.com.ua/yearstat/uploads/OpenDataZNO2021.7z"
+    url21 = "https://zno.testportal.com.ua/yearstat/uploads/OpenDataZNO2021.7z"
     urls = [url19, url21]
 
-    for num in range(urls):
+    for num in range(len(urls)):
         req = requests.get(urls[num], stream=True)
         if req.status_code == 200:
             filename = "ZNO" + years[num]
@@ -199,8 +199,8 @@ def download_7z():
             print('Request failed: %d' % req.status_code)
 
 
-def doesTableExist():
-    conn = createConnection()
+def isTable():
+    conn = create_conn()
     cur = conn.cursor()
     query = """SELECT COUNT(table_name) FROM information_schema.tables
             WHERE table_schema LIKE 'public' AND table_type LIKE 'BASE TABLE' AND table_name = 'zno_records'"""
@@ -213,7 +213,7 @@ def doesTableExist():
 
 
 def createTable():
-    conn = createConnection()
+    conn = create_conn()
     with conn:
         cur = conn.cursor()
 
@@ -284,7 +284,7 @@ def createTable():
         cur.execute(query1)
 
 
-def insertDataIntoDB(df, conn, year):
+def insert_data_to_db(df, conn, year):
     columns = [i[0].upper() + i[1:] for i in df.columns]
     values_string = '%s, ' * (len(columns)+1)
     values_string = values_string[:-2]
@@ -297,8 +297,8 @@ def insertDataIntoDB(df, conn, year):
         num_of_records_to_ignore = cur.fetchall()[0][0]
 
     except psycopg2.OperationalError:
-        conn = createConnection()
-        insertDataIntoDB(df, conn, year)
+        conn = create_conn()
+        insert_data_to_db(df, conn, year)
 
     counter = 0
     for row in df.values:
@@ -317,7 +317,7 @@ def insertDataIntoDB(df, conn, year):
 
             except psycopg2.OperationalError:
                 print("Restoring connection...")
-                conn = createConnection()
+                conn = create_conn()
                 cur = conn.cursor()
                 for el in cash:
                     cur.execute(query1, el)
@@ -334,24 +334,26 @@ def insertDataIntoDB(df, conn, year):
     print("Data of {0} year is successfully inserted.".format(year))
 
 
-def fetchResultsByRegion():
+def get_data_by_region():
     query = "SELECT year, regname, MAX(EngBall100) FROM zno_records WHERE engteststatus='Зараховано' GROUP BY regname, year;"
-    conn = createConnection()
+    conn = create_conn()
     cur = conn.cursor()
     cur.execute(query)
     records = cur.fetchall()
-    fieldnames = ['Year', 'Region', "EngBall100"]
+    field_names = ['Year', 'Region', "EngBall100"]
     rows = []
 
     for record in records:
-        d = {'Year': record[0],
+        d = {
+            'Year': record[0],
             'Region': record[1],
-            "EngBall100": record[2]}
+            "EngBall100": record[2]
+        }
 
         rows.append(d)
 
     with open('records.csv', 'w', encoding='UTF-32') as f:
-        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer = csv.DictWriter(f, fieldnames=field_names)
         writer.writeheader()
         writer.writerows(rows)
         f.close()
