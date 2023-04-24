@@ -44,7 +44,7 @@ def main():
 
 
 def txtStopWatch(start_time):
-    with open('stopwatch.txt', 'w', encoding='UTF-32') as f:
+    with open('timer.txt', 'w', encoding='UTF-32') as f:
         minutes = int((time.time() - start_time)/60)
         seconds = int((time.time() - start_time) - minutes*60)
         f.write("Time of executing: {0}:{1}".format(minutes, seconds))
