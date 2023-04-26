@@ -285,7 +285,7 @@ def createTable():
 
 
 def insert_data_to_db(df, conn, year):
-    columns = [i[0].upper() + i[1:] for i in df.columns]
+    columns = [i for i in df.columns]
     values_string = '%s, ' * (len(columns)+1)
     values_string = values_string[:-2]
     columns = "year, " + ', '.join(columns)
